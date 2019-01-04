@@ -15,42 +15,45 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("New request addr and uri is:", r.RemoteAddr, r.RequestURI)
 
 	if r.RequestURI == "/v1/aecm/add" {
-		mobileID := r.Header.Get("mobileID")
-		mobileName := r.Header.Get("mobileName")
+		osVersion := r.Header.Get("osVersion")
+		brand := r.Header.Get("brand")
+		model := r.Header.Get("model")
+		sdkVersion := r.Header.Get("sdkVersion")
+		packageName := r.Header.Get("packageName")
 		author := r.Header.Get("author")
 
-		if qnsql.AddMobile(sqlDb, mobileID, mobileName, author) {
-			fmt.Fprintf(w, "Sql operator result:success")
-		} else {
-			fmt.Fprintf(w, "Sql operator result:failed")
+		if !qnsql.AddMobile(sqlDb, osVersion, brand, model, sdkVersion, packageName, author) {
+			w.WriteHeader(501)
 		}
 	} else if r.RequestURI == "/v1/aecm/queryall" {
 		retStr := qnsql.QueryMobiles(sqlDb, "")
 		if retStr != "" {
-			fmt.Fprintf(w, "Sql query success:%s", retStr)
+			fmt.Fprintf(w, retStr)
 		} else {
-			fmt.Fprintf(w, "Sql query failed!")
+			w.WriteHeader(501)
 		}
 	} else if r.RequestURI == "/v1/aecm/query" {
-		mobileID := r.Header.Get("mobileID")
-		retStr := qnsql.QueryMobiles(sqlDb, mobileID)
+		model := r.Header.Get("model")
+		retStr := qnsql.QueryMobiles(sqlDb, model)
 		if retStr != "" {
-			fmt.Fprintf(w, "Sql query success:%s", retStr)
+			fmt.Fprintf(w, retStr)
 		} else {
-			fmt.Fprintf(w, "Sql query failed!")
+			w.WriteHeader(501)
 		}
 	} else if r.RequestURI == "/v1/aecm/delete" {
-		mobileID := r.Header.Get("mobileID")
-		if qnsql.DeleteMobile(sqlDb, mobileID) {
-			fmt.Fprintf(w, "Sql delete success")
-		} else {
-			fmt.Fprintf(w, "Sql query failed!")
+		model := r.Header.Get("model")
+		if !qnsql.DeleteMobile(sqlDb, model) {
+			w.WriteHeader(501)
 		}
 	}
 }
 
 // StartHTTPServer Start http server
 func StartHTTPServer(ip string, port int, prifix string) {
+	if !qnsql.DatabaseCheck() {
+		log.Fatal("Database check failed, please check your mysql service!\n")
+		return
+	}
 	sqlDb = qnsql.OpenDatabase()
 	http.HandleFunc(prifix, handler)
 	listenAddr := fmt.Sprintf("%s:%d", ip, port)

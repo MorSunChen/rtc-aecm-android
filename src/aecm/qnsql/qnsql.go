@@ -10,7 +10,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func databaseCheck() bool {
+// DatabaseCheck check database if not exist create table
+func DatabaseCheck() bool {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	db, err := sql.Open("mysql", "root:Cgb815679@/aecm?charset=utf8")
 	if nil != err {
 		log.Fatal(err)
@@ -18,7 +24,7 @@ func databaseCheck() bool {
 	}
 	log.Printf("Database open success!")
 	// create table mobile if not exists.
-	_, err = db.Query("CREATE TABLE IF NOT EXISTS `mobile`(`id` INT UNSIGNED AUTO_INCREMENT, `mobile_id` VARCHAR(100) NOT NULL, `mobile_name` VARCHAR(40) NOT NULL, `author` VARCHAR(40) NOT NULL,`instert_time` DATETIME DEFAULT NOW(), PRIMARY KEY ( `id` ))ENGINE=InnoDB DEFAULT CHARSET=utf8;")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS `mobile`(`id` INT UNSIGNED AUTO_INCREMENT, `osVersion` VARCHAR(20) NOT NULL, `brand` VARCHAR(40) NOT NULL, `model` VARCHAR(40) NOT NULL, `sdkVersion` VARCHAR(20), `packageName` VARCHAR(100) NOT NULL, `author` VARCHAR(40), `instert_time` DATETIME DEFAULT NOW(), PRIMARY KEY ( `id` ))ENGINE=InnoDB DEFAULT CHARSET=utf8;")
 	if err != nil {
 		log.Println(err)
 		return false
@@ -50,14 +56,17 @@ func CloseDatabase(db *sql.DB) {
 }
 
 // AddMobile add new mobile record to sql
-func AddMobile(db *sql.DB, mobileID string, mobileName string, author string) bool {
+func AddMobile(db *sql.DB, osVersion string, brand string, model string, sdkVersion string, packageName string, author string) bool {
 	if db == nil {
 		log.Println("sql.db is nil")
 		return false
 	}
-	sqlStr := fmt.Sprintf("INSERT INTO mobile (mobile_id, mobile_name, author) VALUES (\"%s\",\"%s\",\"%s\")",
-		mobileID,
-		mobileName,
+	sqlStr := fmt.Sprintf("INSERT INTO mobile (osVersion, brand, model, sdkVersion, packageName, author) VALUES (\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\")",
+		osVersion,
+		brand,
+		model,
+		sdkVersion,
+		packageName,
 		author)
 	res, err := db.Exec(sqlStr)
 	if nil != err {
@@ -70,23 +79,29 @@ func AddMobile(db *sql.DB, mobileID string, mobileName string, author string) bo
 }
 
 type aecmMobile struct {
-	mobileID   string
-	mobileName string
-	author     string
-	insertTime string
+	osVersion   string
+	brand       string
+	model       string
+	sdkVersion  string
+	packageName string
+	author      string
+	insertTime  string
 }
 
 func struct2map(obj *aecmMobile) map[string]string {
 	var data = make(map[string]string)
-	data["mobileID"] = obj.mobileID
-	data["mobileName"] = obj.mobileName
+	data["osVersion"] = obj.osVersion
+	data["brand"] = obj.brand
+	data["model"] = obj.model
+	data["sdkVersion"] = obj.sdkVersion
+	data["packageName"] = obj.packageName
 	data["author"] = obj.author
 	data["insertTime"] = obj.insertTime
 	return data
 }
 
 // QueryMobiles return json strings
-func QueryMobiles(db *sql.DB, mobileID string) string {
+func QueryMobiles(db *sql.DB, model string) string {
 	if db == nil {
 		log.Println("sql.db is nil")
 		return ""
@@ -98,8 +113,8 @@ func QueryMobiles(db *sql.DB, mobileID string) string {
 	}()
 
 	var sqlStr = "SELECT * FROM aecm.mobile"
-	if mobileID != "" {
-		sqlStr = fmt.Sprintf("SELECT * FROM aecm.mobile WHERE mobile_id='%s'", mobileID)
+	if model != "" {
+		sqlStr = fmt.Sprintf("SELECT * FROM aecm.mobile WHERE model='%s'", model)
 	}
 	query, err := db.Query(sqlStr)
 	if err != nil {
@@ -109,19 +124,22 @@ func QueryMobiles(db *sql.DB, mobileID string) string {
 	mobileMap := make(map[int]map[string]string)
 	for query.Next() {
 		var id int
-		var mobileID, mobileName, author, insertTime string
-		err := query.Scan(&id, &mobileID, &mobileName, &author, &insertTime)
+		var osVersion, brand, model, sdkVersion, packageName, author, insertTime string
+		err := query.Scan(&id, &osVersion, &brand, &model, &sdkVersion, &packageName, &author, &insertTime)
 		if err != nil {
 			log.Fatal(err)
 			continue
 		}
-		log.Printf("Query scan result: id:%d, mobileID:%s, mobileName:%s, author:%s, insertTime:%s\n",
+		log.Printf("Query scan result: id:%d, osVersion:%s, brand:%s, model:%s, sdkVersion:%s, packageName:%s, author:%s, insertTime:%s\n",
 			id,
-			mobileID,
-			mobileName,
+			osVersion,
+			brand,
+			model,
+			sdkVersion,
+			packageName,
 			author,
 			insertTime)
-		mobileMap[id] = struct2map(&aecmMobile{mobileID, mobileName, author, insertTime})
+		mobileMap[id] = struct2map(&aecmMobile{osVersion, brand, model, sdkVersion, packageName, author, insertTime})
 	}
 	jsonStr, err := json.Marshal(mobileMap)
 	if err != nil {
@@ -133,12 +151,12 @@ func QueryMobiles(db *sql.DB, mobileID string) string {
 }
 
 // DeleteMobile delete this mobile from mysql
-func DeleteMobile(db *sql.DB, mobile string) bool {
+func DeleteMobile(db *sql.DB, model string) bool {
 	if db == nil {
 		log.Fatalln("db is nil")
 		return false
 	}
-	_, err := db.Exec("DELETE FROM mobile WHERE mobile_id=?", mobile)
+	_, err := db.Exec("DELETE FROM mobile WHERE model=?", model)
 	if err != nil {
 		log.Fatal(err)
 		return false
