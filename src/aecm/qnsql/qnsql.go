@@ -17,7 +17,7 @@ func DatabaseCheck() bool {
 			log.Fatal(err)
 		}
 	}()
-	db, err := sql.Open("mysql", "root:Cgb815679@/aecm?charset=utf8")
+	db, err := sql.Open("mysql", "root:@/aecm?charset=utf8")
 	if nil != err {
 		log.Fatal(err)
 		return false

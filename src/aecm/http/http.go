@@ -14,6 +14,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("New request addr and uri is:", r.RemoteAddr, r.RequestURI)
 
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+
 	if r.RequestURI == "/v1/aecm/add" {
 		osVersion := r.Header.Get("osVersion")
 		brand := r.Header.Get("brand")
@@ -28,6 +31,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	} else if r.RequestURI == "/v1/aecm/queryall" {
 		retStr := qnsql.QueryMobiles(sqlDb, "")
 		if retStr != "" {
+			w.Header().Set("Content-Type", "text/json; charset=utf-8")
 			fmt.Fprintf(w, retStr)
 		} else {
 			w.WriteHeader(501)
