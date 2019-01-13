@@ -5,19 +5,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	// 3rd
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type aecmMobile struct {
+	osVersion   string
+	brand       string
+	model       string
+	sdkVersion  string
+	packageName string
+	author      string
+	insertTime  string
+}
+
+var mutex sync.RWMutex
+var mobilesMap = make(map[int]aecmMobile) // key:ID; value:struct of aecmMobile
+
+func struct2map(obj *aecmMobile) map[string]string {
+	var data = make(map[string]string)
+	data["osVersion"] = obj.osVersion
+	data["brand"] = obj.brand
+	data["model"] = obj.model
+	data["sdkVersion"] = obj.sdkVersion
+	data["packageName"] = obj.packageName
+	data["author"] = obj.author
+	data["insertTime"] = obj.insertTime
+	return data
+}
+
 // DatabaseCheck check database if not exist create table
-func DatabaseCheck() bool {
+func DatabaseCheck(sqlUser string, sqlPwd string) bool {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Fatal(err)
 		}
 	}()
-	db, err := sql.Open("mysql", "root:@/aecm?charset=utf8")
+	dataSourceName := fmt.Sprintf("%s:%s@/aecm?charset=utf8", sqlUser, sqlPwd)
+	db, err := sql.Open("mysql", dataSourceName)
 	if nil != err {
 		log.Fatal(err)
 		return false
@@ -39,12 +66,15 @@ func DatabaseCheck() bool {
 }
 
 // OpenDatabase open data base and return sql.DB pointer
-func OpenDatabase() *sql.DB {
-	db, err := sql.Open("mysql", "root:Cgb815679@/aecm?charset=utf8")
+func OpenDatabase(sqlUser string, sqlPwd string) *sql.DB {
+	dataSourceName := fmt.Sprintf("%s:%s@/aecm?charset=utf8", sqlUser, sqlPwd)
+	db, err := sql.Open("mysql", dataSourceName)
 	if nil != err {
 		log.Fatal(err)
 		return nil
 	}
+	// init global varaibal mobilesMap
+	updateMobilesMap(db)
 	return db
 }
 
@@ -61,6 +91,11 @@ func AddMobile(db *sql.DB, osVersion string, brand string, model string, sdkVers
 		log.Println("sql.db is nil")
 		return false
 	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	sqlStr := fmt.Sprintf("INSERT INTO mobile (osVersion, brand, model, sdkVersion, packageName, author) VALUES (\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\")",
 		osVersion,
 		brand,
@@ -75,36 +110,17 @@ func AddMobile(db *sql.DB, osVersion string, brand string, model string, sdkVers
 	}
 	id, _ := res.LastInsertId()
 	log.Println("last insert id:", id)
+
+	updateMobilesMap(db)
+
 	return true
 }
 
-type aecmMobile struct {
-	osVersion   string
-	brand       string
-	model       string
-	sdkVersion  string
-	packageName string
-	author      string
-	insertTime  string
-}
-
-func struct2map(obj *aecmMobile) map[string]string {
-	var data = make(map[string]string)
-	data["osVersion"] = obj.osVersion
-	data["brand"] = obj.brand
-	data["model"] = obj.model
-	data["sdkVersion"] = obj.sdkVersion
-	data["packageName"] = obj.packageName
-	data["author"] = obj.author
-	data["insertTime"] = obj.insertTime
-	return data
-}
-
-// QueryMobiles return json strings
-func QueryMobiles(db *sql.DB, model string) string {
+// updateMobilesMap return json strings
+func updateMobilesMap(db *sql.DB) {
 	if db == nil {
 		log.Println("sql.db is nil")
-		return ""
+		return
 	}
 	defer func() {
 		if err := recover(); err != nil {
@@ -113,15 +129,12 @@ func QueryMobiles(db *sql.DB, model string) string {
 	}()
 
 	var sqlStr = "SELECT * FROM aecm.mobile"
-	if model != "" {
-		sqlStr = fmt.Sprintf("SELECT * FROM aecm.mobile WHERE model='%s'", model)
-	}
 	query, err := db.Query(sqlStr)
 	if err != nil {
 		log.Println(err)
-		return ""
+		return
 	}
-	mobileMap := make(map[int]map[string]string)
+	mutex.Lock()
 	for query.Next() {
 		var id int
 		var osVersion, brand, model, sdkVersion, packageName, author, insertTime string
@@ -139,15 +152,38 @@ func QueryMobiles(db *sql.DB, model string) string {
 			packageName,
 			author,
 			insertTime)
-		mobileMap[id] = struct2map(&aecmMobile{osVersion, brand, model, sdkVersion, packageName, author, insertTime})
+		mobilesMap[id] = aecmMobile{osVersion, brand, model, sdkVersion, packageName, author, insertTime}
 	}
-	jsonStr, err := json.Marshal(mobileMap)
-	if err != nil {
-		log.Fatal(err)
-		return ""
+	mutex.Unlock()
+}
+
+// QueryMobiles query mobiles from memory, and return json string
+func QueryMobiles(model string) (string, bool) {
+	mutex.RLock()
+	if model == "" {
+		tmpMap := make(map[int]map[string]string)
+		for key, val := range mobilesMap {
+			tmpMap[key] = struct2map(&val)
+		}
+		jsonStr, err := json.Marshal(tmpMap)
+		if err != nil {
+			log.Fatal(err)
+			mutex.RUnlock()
+			return "", false
+		}
+		log.Printf("%s\n", jsonStr)
+		mutex.RUnlock()
+		return string(jsonStr), true
+	} else {
+		for _, val := range mobilesMap {
+			if val.model == model {
+				mutex.RUnlock()
+				return "", true
+			}
+		}
+		mutex.RUnlock()
+		return "", false
 	}
-	log.Printf("%s\n", jsonStr)
-	return string(jsonStr)
 }
 
 // DeleteMobile delete this mobile from mysql
@@ -156,10 +192,16 @@ func DeleteMobile(db *sql.DB, model string) bool {
 		log.Fatalln("db is nil")
 		return false
 	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	_, err := db.Exec("DELETE FROM mobile WHERE model=?", model)
 	if err != nil {
 		log.Fatal(err)
 		return false
 	}
+	updateMobilesMap(db)
 	return true
 }

@@ -29,7 +29,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(501)
 		}
 	} else if r.RequestURI == "/v1/aecm/queryall" {
-		retStr := qnsql.QueryMobiles(sqlDb, "")
+		retStr, _ := qnsql.QueryMobiles("")
 		if retStr != "" {
 			w.Header().Set("Content-Type", "text/json; charset=utf-8")
 			fmt.Fprintf(w, retStr)
@@ -38,9 +38,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if r.RequestURI == "/v1/aecm/query" {
 		model := r.Header.Get("model")
-		retStr := qnsql.QueryMobiles(sqlDb, model)
-		if retStr != "" {
-			fmt.Fprintf(w, retStr)
+		_, ret := qnsql.QueryMobiles(model)
+		if ret == true {
+			w.WriteHeader(200)
 		} else {
 			w.WriteHeader(501)
 		}
@@ -53,13 +53,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 // StartHTTPServer Start http server
-func StartHTTPServer(ip string, port int, prifix string) {
-	if !qnsql.DatabaseCheck() {
+func StartHTTPServer(addr string, prifix string, sqlUser string, sqlPwd string) {
+	if !qnsql.DatabaseCheck(sqlUser, sqlPwd) {
 		log.Fatal("Database check failed, please check your mysql service!\n")
 		return
 	}
-	sqlDb = qnsql.OpenDatabase()
+	sqlDb = qnsql.OpenDatabase(sqlUser, sqlPwd)
 	http.HandleFunc(prifix, handler)
-	listenAddr := fmt.Sprintf("%s:%d", ip, port)
-	log.Fatal(http.ListenAndServe(listenAddr, nil))
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
