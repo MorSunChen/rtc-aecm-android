@@ -23,7 +23,8 @@ API 查询接口提供两种，一是查询指定 `Model` 是否存在于此白�
 
 ```
 Request Url:
-SEV_ADDR/v1/aecm/query
+SEV_ADDR/v1/aecm
+Method: OPTIONS
 
 Request Headers:
 model=xxx
@@ -39,7 +40,8 @@ Result:
 
 ```
 Request Url:
-SEV_ADDR/v1/aecm/queryall
+SEV_ADDR/v1/aecm
+Method: QUERY
 
 Result:
 200 ok
@@ -79,12 +81,13 @@ body: json string
 
 ```
 Request Url:
-SEV_ADDR/v1/aecm/add
+SEV_ADDR/v1/aecm
+Method: ADD
 
 Request Headers:
 osVersion=Android 6.2
 brand=postman_brand
-model=redmi2
+model=xxx
 sdkVersion=1.0.0
 packageName=com.org.xxx
 author=gobert
@@ -98,10 +101,11 @@ Result:
 
 ```
 Request Url:
-SEV_ADDR/v1/aecm/delete
+SEV_ADDR/v1/aecm
+Method:DELETE
 
 Request Headers:
-model=redmi2
+model=xxx
 
 Result:
 200 ok

@@ -40,13 +40,13 @@ func struct2map(obj *aecmMobile) map[string]string {
 func DatabaseCheck(sqlUser string, sqlPwd string) bool {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
 	dataSourceName := fmt.Sprintf("%s:%s@/aecm?charset=utf8", sqlUser, sqlPwd)
 	db, err := sql.Open("mysql", dataSourceName)
 	if nil != err {
-		log.Fatal(err)
+		log.Println(err)
 		return false
 	}
 	log.Printf("Database open success!")
@@ -70,7 +70,7 @@ func OpenDatabase(sqlUser string, sqlPwd string) *sql.DB {
 	dataSourceName := fmt.Sprintf("%s:%s@/aecm?charset=utf8", sqlUser, sqlPwd)
 	db, err := sql.Open("mysql", dataSourceName)
 	if nil != err {
-		log.Fatal(err)
+		log.Println(err)
 		return nil
 	}
 	// init global varaibal mobilesMap
@@ -93,7 +93,7 @@ func AddMobile(db *sql.DB, osVersion string, brand string, model string, sdkVers
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
 	sqlStr := fmt.Sprintf("INSERT INTO mobile (osVersion, brand, model, sdkVersion, packageName, author) VALUES (\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\")",
@@ -105,7 +105,7 @@ func AddMobile(db *sql.DB, osVersion string, brand string, model string, sdkVers
 		author)
 	res, err := db.Exec(sqlStr)
 	if nil != err {
-		log.Fatal(err)
+		log.Println(err)
 		return false
 	}
 	id, _ := res.LastInsertId()
@@ -140,7 +140,7 @@ func updateMobilesMap(db *sql.DB) {
 		var osVersion, brand, model, sdkVersion, packageName, author, insertTime string
 		err := query.Scan(&id, &osVersion, &brand, &model, &sdkVersion, &packageName, &author, &insertTime)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 			continue
 		}
 		log.Printf("Query scan result: id:%d, osVersion:%s, brand:%s, model:%s, sdkVersion:%s, packageName:%s, author:%s, insertTime:%s\n",
@@ -167,7 +167,7 @@ func QueryMobiles(model string) (string, bool) {
 		}
 		jsonStr, err := json.Marshal(tmpMap)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 			mutex.RUnlock()
 			return "", false
 		}
@@ -189,17 +189,17 @@ func QueryMobiles(model string) (string, bool) {
 // DeleteMobile delete this mobile from mysql
 func DeleteMobile(db *sql.DB, model string) bool {
 	if db == nil {
-		log.Fatalln("db is nil")
+		log.Println("db is nil")
 		return false
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
 	_, err := db.Exec("DELETE FROM mobile WHERE model=?", model)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return false
 	}
 	updateMobilesMap(db)

@@ -12,12 +12,16 @@ var sqlDb *sql.DB
 
 func handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Println("New request addr and uri is:", r.RemoteAddr, r.RequestURI)
+	if r.RequestURI != "/v1/aecm/" {
+		w.WriteHeader(404)
+		return
+	}
+	log.Println("New request Method, addr and uri is:", r.Method, r.RemoteAddr, r.RequestURI)
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 
-	if r.RequestURI == "/v1/aecm/add" {
+	if r.Method == "ADD" {
 		osVersion := r.Header.Get("osVersion")
 		brand := r.Header.Get("brand")
 		model := r.Header.Get("model")
@@ -28,7 +32,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if !qnsql.AddMobile(sqlDb, osVersion, brand, model, sdkVersion, packageName, author) {
 			w.WriteHeader(501)
 		}
-	} else if r.RequestURI == "/v1/aecm/queryall" {
+	} else if r.Method == "QUERY" {
 		retStr, _ := qnsql.QueryMobiles("")
 		if retStr != "" {
 			w.Header().Set("Content-Type", "text/json; charset=utf-8")
@@ -36,7 +40,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(501)
 		}
-	} else if r.RequestURI == "/v1/aecm/query" {
+	} else if r.Method == "OPTIONS" {
 		model := r.Header.Get("model")
 		_, ret := qnsql.QueryMobiles(model)
 		if ret == true {
@@ -44,7 +48,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(501)
 		}
-	} else if r.RequestURI == "/v1/aecm/delete" {
+	} else if r.Method == "DELETE" {
 		model := r.Header.Get("model")
 		if !qnsql.DeleteMobile(sqlDb, model) {
 			w.WriteHeader(501)
@@ -55,7 +59,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 // StartHTTPServer Start http server
 func StartHTTPServer(addr string, prifix string, sqlUser string, sqlPwd string) {
 	if !qnsql.DatabaseCheck(sqlUser, sqlPwd) {
-		log.Fatal("Database check failed, please check your mysql service!\n")
+		log.Print("Database check failed, please check your mysql service!\n")
 		return
 	}
 	sqlDb = qnsql.OpenDatabase(sqlUser, sqlPwd)
